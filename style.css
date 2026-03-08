@@ -949,3 +949,129 @@ body {
     grid-template-columns: 120px 1fr 64px 40px;
   }
 }
+
+/* ─── Live wheel container ───────────────────────────────────────────────────── */
+.wheel-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 24px 20px;
+  margin-bottom: 8px;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--doc-border);
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  animation: fadeIn 0.4s ease;
+}
+
+#domain-wheel {
+  width: 280px;
+  height: 280px;
+}
+
+.wheel-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: center;
+  max-width: 320px;
+}
+
+.wheel-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: Georgia, serif;
+  font-size: 0.72rem;
+  color: var(--doc-mid);
+}
+
+.wheel-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.wheel-legend-name {
+  color: var(--doc-dark);
+}
+
+.wheel-legend-score {
+  color: var(--gold);
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+/* ─── Domain readout card (appears after each placement) ─────────────────────── */
+.domain-readout {
+  align-self: flex-start;
+  margin: 4px 0 8px;
+  animation: fadeIn 0.35s ease;
+}
+
+.domain-readout-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--doc-border);
+  border-left: 3px solid var(--gold);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.domain-readout-label {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  min-width: 80px;
+}
+
+.domain-readout-score {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.8rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.domain-readout-denom {
+  font-size: 0.9rem;
+  opacity: 0.5;
+  margin-left: 2px;
+}
+
+.domain-readout-tier {
+  font-family: Georgia, serif;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--doc-mid);
+  flex: 1;
+}
+
+.domain-readout-horizon {
+  font-family: Georgia, serif;
+  font-size: 0.72rem;
+  color: rgba(200,169,110,0.7);
+  letter-spacing: 0.06em;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .wheel-container { padding: 20px 16px 16px; }
+  #domain-wheel { width: 240px; height: 240px; }
+  .domain-readout-inner { gap: 10px; padding: 10px 16px; }
+  .domain-readout-score { font-size: 1.5rem; }
+}
