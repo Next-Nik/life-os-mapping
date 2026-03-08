@@ -1,589 +1,452 @@
-// LIFE OS — CHAT ENGINE v3
-// Seven domains + Brain as synthesis question
-// Domains: Path, Spark, Body, Finances, Relationships, Inner Game, Outer Game
-// Stewardship frame throughout. Behavioural evidence over self-report.
-// Corpus upgrades: Avatar theatre framing, character synthesis step, thinness named not routed,
-// Horizon Goal calibration probe, permission for partial models, job/path distinction,
-// Spark permission-first, Finances dual-track (objective + emotional), Brain as closing synthesis.
+// LIFE OS — APP LOGIC v3
+// Session management, API communication, event handling.
+// Seven domains: Path, Spark, Body, Finances, Relationships, Inner Game, Outer Game
 
-const Anthropic = require("@anthropic-ai/sdk");
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const App = {
+  session: null,
+  isWaiting: false,
 
-// ─── The seven domains ────────────────────────────────────────────────────────
-const DOMAINS = [
-  {
-    id: "path",
-    label: "Path",
-    stewardshipQuestion: "Am I walking my path — or just walking?",
-    fractal: "Vision",
-    avatarPrompt: `We're starting with Path — not your job, but your gift alive in the world. The question this domain holds is: am I on my path, and am I actually moving?
-
-To set your scale, I want you to build a character. Think of the people — living, historical, fictional, or composite — who represent what 10/10 looks like in this domain for someone like you. Not best in the world in general. Best in the world for the life you're here to live.
-
-A few things worth knowing as you build this:
-
-You can include someone you admire in one dimension even if you wouldn't want their whole life. Someone whose vision you want without their impact on people around them. Someone whose scale you want without their values. We're building a character, not endorsing a person — so bring the part that matters and leave the rest. Modifiers are welcome. That's not a caveat, it's useful data.
-
-Don't edit the list toward people only in your field. The outliers often crack the pattern open.
-
-One more thing worth naming: your job might be part of your Path — or it might simply be what puts food on the table while your Path gets lived somewhere else entirely. What you do for income doesn't have to be meaningful, it just has to be functional for you. Someone can be fully on their Path without their job being any part of it, as long as your job isn't taking away from your Path in a significant way. We're asking about Path, not employment.
-
-Now — who's in your character? Give me the names, the composites, the qualities. Anyone who belongs.`,
-
-    avatarSynthesisPrompt: `Good. Before we move to where you actually are, I want to make sure we've captured the character clearly enough.
-
-Looking at who you named — what do these people share? What's the essential quality or combination of qualities you're pointing at? Imagine this character walking into a room or onto a stage. What would an audience immediately see and understand about them? What's unmistakable?
-
-We're not looking for a list of their achievements. We're looking for the essence — specific enough that someone could play the role.`,
-
-    placementPrompt: `Now — with that character as your 10 — describe what Path actually looks like in your life right now.
-
-Not where you want it to be. Not where you're headed. Where it actually is.
-
-What are you doing, how does it feel, what's genuinely moving, and where are you stalled or in the wrong lane entirely? If you're running two tracks — the work that pays and the work that calls — include both. They're often different and both matter here.`,
-
-    horizonPrompt: `If a genie tapped you on the head right now and granted your wish in Path — what would it be?
-
-Not the character you built. Not the ceiling. Your actual wish for your actual life.
-
-Some people want the full expression of the character. Most want something more specific and closer — a particular project alive, a particular kind of day as the norm, a particular kind of contribution landing. There's no wrong answer. The genie is asking what would feel like winning for you specifically.`
+  init() {
+    this.bindEvents();
   },
-  {
-    id: "spark",
-    label: "Spark",
-    stewardshipQuestion: "Is the fire on?",
-    fractal: "Human Being",
-    avatarPrompt: `Spark holds the animating force — the thing that makes you specifically alive. Not fun or relaxation, though those can be expressions of it. The real question this domain asks is: is the fire on?
 
-To set your scale — who or what represents 10/10 in Spark for someone like you? Someone whose aliveness is unmistakable. Whose fire is clearly on. This might be a person, a way of being, a specific quality of presence.
-
-Same rules: composites welcome, partial models welcome, outliers welcome. Who belongs in this character?`,
-
-    avatarSynthesisPrompt: `What does this character radiate? If you distilled what you're pointing at down to the essential quality of their aliveness — what is it? What's on in them that you want on in you?`,
-
-    permissionPrompt: `Before I ask where you are — one question first.
-
-When you imagine genuinely making time for the things that make you feel alive — not productive, not useful, just alive — what comes up for you?
-
-Is there anything in the way of that, even before we get to what it would look like?`,
-
-    placementPrompt: `Where is your Spark right now — honestly?
-
-Not your energy levels or your schedule. The fire itself. Is it on, off, dimmed, flickering? Where do you feel genuinely alive in your week, and where has something gone quiet that used to be lit?
-
-Be specific about what's actually present and what's actually absent.`,
-
-    horizonPrompt: `If a genie granted your wish in Spark — what would it be? What would genuinely alive feel like in your actual daily life? What would be present that isn't now?`
-  },
-  {
-    id: "body",
-    label: "Body",
-    stewardshipQuestion: "How is this living system doing?",
-    fractal: "Nature",
-    avatarPrompt: `Body holds the living ecology — you're not maintaining a vessel, you're in relationship with a living system. The stewardship question is: how is this system doing?
-
-To set your scale — who represents 10/10 in Body for someone like you specifically? Your age, your context, your history. Not a generic fitness ideal. The best physical expression of what's actually possible and meaningful for someone with your specific life.
-
-Composites welcome. Partial models welcome — someone whose energy you want without their obsession, someone whose relationship with food you want without the extremes.`,
-
-    avatarSynthesisPrompt: `What does this character's relationship with their body actually look like? What's the quality — not the metrics, but the lived experience? What would you immediately notice about how they inhabit their physical life?`,
-
-    placementPrompt: `Where is your Body right now — honestly?
-
-Describe the living system: energy levels, sleep, how you move, how you eat, how you feel inside your physical life day to day. Include what you're minimising or glossing over. Injuries count. Fatigue counts. Post-burnout recovery counts. The gap between what you intend and what you actually do counts.`,
-
-    horizonPrompt: `If a genie granted your wish in Body — what would it be? Not the Avatar. What would genuinely thriving in your body feel like for your actual life? What would you be able to do, how would you feel, what would be different about how you inhabit your days?`
-  },
-  {
-    id: "finances",
-    label: "Finances",
-    stewardshipQuestion: "Do I have the agency to act on what matters?",
-    fractal: "Finance & Economy",
-    avatarPrompt: `Finances holds agency — the power to make things happen. A low score here doesn't primarily mean not enough money. It means lacking the power to act on what matters.
-
-To set your scale — who represents 10/10 in Finances for someone like you? Someone whose relationship with money and resources genuinely represents what's possible — not just the numbers, but the agency, the freedom, the relationship to abundance and scarcity.
-
-Partial models especially welcome here. Someone whose financial freedom you want without their relationship to accumulation. Someone whose generosity you want without their specific path to it.
-
-One thing worth naming: your job might be the engine that powers your finances, or your Path might be, or some combination. However income arrives is fine — we're asking about your relationship to resources and agency, not how you earn or whether your income is meaningful to you.`,
-
-    avatarSynthesisPrompt: `What's the essential quality you're pointing at in this character? Is it the freedom, the security, the generosity, the agency — or some specific combination? What would you immediately sense about how they relate to money and resources?`,
-
-    placementPrompt: `Where are you honestly right now in Finances?
-
-Two things matter here and they're often different: your objective position — the actual numbers, debt, runway, income — and your emotional relationship to money — how it feels, how much it runs you, whether you feel empowered or constrained.
-
-Tell me both. They're both real data.`,
-
-    horizonPrompt: `If a genie granted your wish in Finances — what would it be? What would financial thriving actually look like for your specific life — not the ceiling, your actual wish?`
-  },
-  {
-    id: "relationships",
-    label: "Relationships",
-    stewardshipQuestion: "Am I truly known by anyone?",
-    fractal: "Society",
-    avatarPrompt: `Relationships holds the depth of human connection — the question isn't how many people you know, it's whether anyone truly knows you.
-
-To set your scale — who represents 10/10 here for someone like you? Someone whose depth of connection, quality of belonging, and health of bonds genuinely represents what's possible.
-
-Think across the different layers: intimate partnership, close friendships, family, community. Your character might be stronger in some layers than others — that's worth noting.`,
-
-    avatarSynthesisPrompt: `What's the essential quality in this character's relationships? Is it the depth, the safety, the being-known, the community — what's unmistakable about how they connect with people?`,
-
-    placementPrompt: `Where are your Relationships right now — honestly?
-
-The quality of your closest connections, your sense of belonging, what's genuinely deep and what's lonely or frayed. Include what's circumstantial — if you've recently moved, if people are far away, if there's been rupture. Context matters here.`,
-
-    horizonPrompt: `If a genie granted your wish in Relationships — what would it be? What would your ideal relational life actually look like — not the perfect version, your genuine wish?`
-  },
-  {
-    id: "inner_game",
-    label: "Inner Game",
-    stewardshipQuestion: "Are my stories tending me, or running me?",
-    fractal: "Legacy",
-    avatarPrompt: `Inner Game holds the stories you carry — not beliefs in the abstract, but the specific narrative inheritance from your history, your family, your culture, your inner critic. The stewardship question is: are these stories tending you, or running you?
-
-To set your scale — who represents 10/10 in Inner Game for someone like you? Someone with a genuinely healthy, grounded, honest internal life. Not someone who has it all figured out — someone who has a real relationship with their own interior.`,
-
-    avatarSynthesisPrompt: `What's the quality you're pointing at in this character's inner life? What does their relationship with themselves actually look like — under pressure, in private, when things go wrong?`,
-
-    placementPrompt: `What's your Inner Game actually like right now?
-
-Not the fluent version you'd give in a coaching session. The real one. The specific recurring patterns, the operating beliefs that run in the background, the stories about yourself you haven't fully examined. Where do you feel genuinely solid inside, and where are you running on old programming?
-
-If this domain is hard to answer — that's worth naming too.`,
-
-    horizonPrompt: `If a genie granted your wish in Inner Game — what would it be? What would a genuinely healthy, grounded inner life feel like for you specifically?`
-  },
-  {
-    id: "outer_game",
-    label: "Outer Game",
-    stewardshipQuestion: "Is what I'm broadcasting aligned with who I actually am?",
-    fractal: "Society",
-    avatarPrompt: `Outer Game holds the broadcast — the signal you send to the world about who you are and what you stand for, whether you're conscious of it or not. A low score here isn't an aesthetic problem. It's a gap between inner truth and outer transmission.
-
-To set your scale — who represents 10/10 in Outer Game for someone like you? Someone whose external expression — how they present, how they carry themselves, what they put into the world — is genuinely aligned with who they are inside.`,
-
-    avatarSynthesisPrompt: `What's unmistakable about this character's broadcast? What do people immediately receive when they encounter them — online, in person, in their environment? What's the alignment you're pointing at?`,
-
-    placementPrompt: `Where are you right now in Outer Game — honestly?
-
-How you're actually showing up externally. Your appearance, your environment, your digital presence, the gap between how you want to be perceived and how you're actually coming across. Include what you've been meaning to change but haven't. The presence that's planned but not yet public.`,
-
-    horizonPrompt: `If a genie granted your wish in Outer Game — what would it be? What would genuine alignment between your inner truth and your outer broadcast look like for your actual life?`
-  }
-];
-
-// ─── Brain — closing synthesis question (not a peer domain) ──────────────────
-const BRAIN_PROMPT = `One final question — and this one is different from the others.
-
-Brain isn't a domain to assess like the rest. It's a synthesis question that takes its shape from everything you've just shared.
-
-Given your Horizon Life across all seven domains — the life you've described wanting in Path, Spark, Body, Finances, Relationships, Inner Game, and Outer Game — what do you actually need to learn?
-
-Not what you think you should learn. Not what's interesting in the abstract. What knowledge, skill, or understanding would most directly close the gap between where you are and where you want to be?`;
-
-// ─── Session factory ──────────────────────────────────────────────────────────
-function createSession() {
-  return {
-    phase: "welcome",
-    domainIndex: 0,
-    domainStep: "avatar",        // avatar → avatar_synthesis → permission(spark only) → placement → horizon → horizon_calibration
-    probeCount: 0,
-    transcript: [],
-    domainData: {},
-    currentPlacement: null,
-    brainAnswer: null,
-    status: "active"
-  };
-}
-
-// ─── Thin answer detection ────────────────────────────────────────────────────
-function isThin(answer) {
-  const words = answer.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 12) return true;
-  const deflectors = ["not sure", "idk", "i don't know", "nothing", "don't know", "not really"];
-  const lower = answer.toLowerCase();
-  return deflectors.filter(d => lower.includes(d)).length >= 2;
-}
-
-// ─── Thinness response — name it, don't route around it ──────────────────────
-function thinnessResponse(step, probeCount) {
-  if (probeCount === 0) {
-    if (step === "avatar") return `I notice this one didn't come as easily. Is it that the domain feels less alive right now, or is there something here you're not quite ready to look at?\n\nEither way — even a rough answer works. Who came to mind first, even if they feel like an odd choice?`;
-    if (step === "placement") return `I notice this one came out thin. Is this domain less active for you right now, or is there something that's harder to say honestly?\n\nBoth are useful. What's actually true here, even if it's uncomfortable?`;
-    if (step === "horizon") return `When the genie question lands thin, it usually means one of two things — either this domain isn't live enough yet to imagine changing, or there's something you want but haven't let yourself fully go for.\n\nWhich is closer? What would you say if you let yourself answer honestly?`;
-  }
-  return `Even a brief honest answer is more useful than a complete one that isn't quite true. What's actually present here right now?`;
-}
-
-// ─── Placement inference prompt ───────────────────────────────────────────────
-function placementInferencePrompt(session, domain) {
-  return `You are the Life OS assessment engine. Infer honest placement for ${domain.label}.
-
-Stewardship question: "${domain.stewardshipQuestion}"
-Avatar character: ${session.domainData[domain.id]?.characterBrief || session.domainData[domain.id]?.avatarList || "not captured"}
-Current reality: ${session.currentPlacement}
-
-Infer an honest score from behavioural evidence only — not aspirations, not intentions, not self-assessment. Read what they emphasised, minimised, and omitted. The scale uses half-point increments.
-
-THE HORIZON SCALE — score against these precisely:
-10  World-Class       — Complete coherence. Effortless mastery, luminous presence, contribution that uplifts others. The art and the artist are one.
-9.5 Exemplar+        — Integrated and at ease. Leads by example; influence radiates naturally.
-9   Exemplar         — Deeply skilled, balanced, reliable. Excellence feels natural and sustainable.
-8.5 Fluent+          — Competence meets wisdom; growth through curiosity and depth.
-8   Fluent           — Solid foundations, steady excellence, self-aware and grounded.
-7.5 Capable+         — Consistent progress; confidence building through deliberate practice.
-7   Capable          — Dependable, engaged, purposeful.
-6.5 Functional+      — Mostly consistent; stabilising habits, pacing energy.
-6   Functional       — Competent, responsible; maintaining, sometimes fatigued.
-5.5 Plateau+         — Curiosity stirring; ready to move again.
-5   Plateau          — Holding steady but uninspired; minimal expansion.
-4.5 Friction+        — Restless recognition that change is due.
-4   Friction         — Desire present, momentum low; self-judgment softening into openness.
-3.5 Strain+          — Inconsistent, overwhelmed, starting to see the cycle.
-3   Strain           — Energy collapsed inward; fear or shame active. Needs rest, not force.
-2.5 Crisis+          — High stress, low support; survival instincts active.
-2   Crisis           — Basics unmet, clarity lost; exhaustion or anxiety chronic.
-1.5 Emergency+       — Alternating between intensity and shutdown.
-1   Emergency        — Spiritually or emotionally collapsed; light dimmed.
-0   Ground Zero      — End of a cycle. Stillness before rebirth.
-
-CRITICAL: Any score below 5 means this domain is actively creating harm to the person and the people around them. Name this honestly in the reflection without shame. Use the tier language naturally.
-
-Write a 2-3 sentence reflection grounded in what they actually described. Warm, direct, precise. Reference specific things they said. Include the tier name naturally.
-
-Respond ONLY with valid JSON, no markdown:
-{"score":<0-10 in 0.5 increments>,"tier":"<tier name>","reflection":"<2-3 sentences>","invite_correction":"<one sentence>"}`;
-}
-
-// ─── Avatar synthesis prompt ──────────────────────────────────────────────────
-function avatarSynthesisPrompt(session, domain) {
-  return `You are the Life OS assessment engine. Synthesise a character brief for ${domain.label}.
-
-Avatar list: ${session.domainData[domain.id]?.avatarList || ""}
-Character description: ${session.domainData[domain.id]?.avatarCharacter || ""}
-
-Write a 2-3 sentence character brief capturing the essential quality they're pointing at. Specific enough to be recognisable. Written as a character description, not a list of achievements.
-
-Respond ONLY with valid JSON, no markdown:
-{"characterBrief":"<2-3 sentences>"}`;
-}
-
-// ─── Final synthesis prompt ───────────────────────────────────────────────────
-function finalSynthesisPrompt(session) {
-  const domainSummaries = Object.entries(session.domainData).map(([id, data]) => {
-    const d = DOMAINS.find(d => d.id === id);
-    if (!d) return "";
-    return `${d.label} — "${d.stewardshipQuestion}"
-  Score: ${data.score}/10
-  Character: ${data.characterBrief || data.avatarList || "not captured"}
-  Current reality: ${data.placement || "not captured"}
-  Horizon Goal: ${data.horizon || "not captured"}`;
-  }).filter(Boolean).join("\n\n");
-
-  return `You are the Life OS assessment engine delivering the final map.
-
-Domain data:
-${domainSummaries}
-
-Brain synthesis: ${session.brainAnswer || "not provided"}
-
-Produce the final Life OS map.
-
-STAGE — identify from score patterns:
-Stabilisation: Multiple domains 2-4, needs stabilisation before development work
-Orientation: Mixed 3-6, needs honest self-location and life coherence
-Alignment: Most domains 5-7, ready to look outward at contribution
-Development: Most domains 6-8, compounding what's working
-Transformation: Most domains 7+, hitting identity ceiling, ready for crossing
-
-FOCUS DOMAINS — three most catalytic right now. CRITICAL TRIAGE RULE: any domain scoring below 5 is an active harm zone and must be included as a focus domain — this takes priority over catalytic potential. Below-5 domains are addressed before optimisation work elsewhere.
-
-OVERALL REFLECTION — 3-4 paragraphs. This is the recognition moment. Write as someone who listened carefully to their whole life for the last hour. Not a report. Not a list. A genuine synthesis — their current reality, their Horizon Goals, what the patterns show, what's possible. Every sentence should only be possible because of what this specific person shared. The emotional endpoint is not "that's accurate" — it is "how did it know that."
-
-Respond ONLY with valid JSON, no markdown:
-{"stage":"<Stabilisation|Orientation|Alignment|Development|Transformation>","stage_description":"<2-3 sentences specific to them, not generic>","focus_domains":["<id>","<id>","<id>"],"focus_reasoning":"<why these three — below-5 domains named first if present, then catalytic logic>","overall_reflection":"<3-4 paragraphs>","brain_insight":"<what the Brain answer reveals>","next_step":"<one honest specific sentence>"}`;
-}
-
-// ─── Main handler ─────────────────────────────────────────────────────────────
-module.exports = async (req, res) => {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-
-  const { messages = [], session: clientSession } = req.body;
-  const session = clientSession || createSession();
-
-  try {
-
-    // ── Welcome ───────────────────────────────────────────────────────────────
-    if (session.phase === "welcome" || messages.length === 0) {
-      session.phase = "domain";
-      session.domainIndex = 0;
-      session.domainStep = "avatar";
-
-      return res.json({
-        session,
-        phase: "domain",
-        phaseLabel: "Path — 1 of 7",
-        message: `Welcome to Life OS.\n\nThis is the beginning of seeing your life clearly — all of it, across seven domains. Not where you wish you were. Where you actually are. And where you genuinely want to go.\n\nIn each domain, three steps. First, you'll build a character — who represents 10/10 for someone like you specifically. Then you'll describe where you honestly are right now. Then the genie question: if your wish were granted here, what would it actually be?\n\nNo right answers. Only honest ones. About 20–30 minutes.\n\nLet's begin.\n\n${DOMAINS[0].avatarPrompt}`,
-        inputMode: "text"
+  bindEvents() {
+    let currentSlide = 0;
+    const totalSlides = 3;
+    const track = document.getElementById("carousel-track");
+    const arrow = document.getElementById("carousel-arrow");
+    const dots  = document.querySelectorAll(".carousel-dot");
+
+    const advanceCarousel = () => {
+      currentSlide++;
+      track.style.transform = `translateX(-${currentSlide * 33.333}%)`;
+      dots.forEach((d, i) => d.classList.toggle("active", i === currentSlide));
+
+      if (currentSlide === totalSlides - 1) {
+        arrow.outerHTML = `<button class="carousel-begin" id="carousel-arrow">Begin your map</button>`;
+        document.getElementById("carousel-arrow").addEventListener("click", () => this.startConversation());
+      }
+    };
+
+    if (arrow) arrow.addEventListener("click", advanceCarousel);
+
+    const sendBtn = document.getElementById("send-btn");
+    const input   = document.getElementById("user-input");
+
+    if (sendBtn) sendBtn.addEventListener("click", () => this.sendUserInput());
+
+    if (input) {
+      input.addEventListener("input", () => {
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 120) + "px";
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          this.sendUserInput();
+        }
       });
     }
+  },
 
-    const userMessage = messages[messages.length - 1]?.content || "";
-    session.transcript.push({ role: "user", content: userMessage });
+  async startConversation() {
+    UI.hideWelcome();
+    UI.showChat();
 
-    const domain = session.domainIndex < DOMAINS.length ? DOMAINS[session.domainIndex] : null;
-    const domainId = domain?.id;
+    const chatContainer = document.getElementById("chat-container");
+    const typingEl = UI.createTypingIndicator();
+    chatContainer.appendChild(typingEl);
+    UI.scrollToBottom();
 
-    // ── Brain synthesis ───────────────────────────────────────────────────────
-    if (session.phase === "brain") {
-      session.brainAnswer = userMessage;
-      session.phase = "final_synthesis";
+    try {
+      const data = await this.callAPI([]);
+      UI.hideTyping();
+      this.handleAPIResponse(data);
+    } catch (err) {
+      UI.hideTyping();
+      this.addAssistantMessage("Something went wrong. Please refresh and try again.");
+    }
+  },
 
-      const synthResponse = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2500,
-        messages: [{ role: "user", content: finalSynthesisPrompt(session) }]
-      });
+  sendUserInput() {
+    if (this.isWaiting) return;
+    const input = document.getElementById("user-input");
+    const text  = input ? input.value.trim() : "";
+    if (!text) return;
+    this.sendMessage(text);
+  },
 
-      let synthData;
-      try {
-        const raw = synthResponse.content[0].text.replace(/```json|```/g, "").trim();
-        synthData = JSON.parse(raw);
-      } catch {
-        synthData = {
-          stage: "Orientation",
-          stage_description: "You're in the process of seeing your whole life clearly.",
-          focus_domains: ["path", "spark", "inner_game"],
-          focus_reasoning: "These three domains show the most catalytic potential based on what you've shared.",
-          overall_reflection: "You've shared something real across all seven domains. The picture that emerges is of someone navigating meaningful gaps between current reality and a genuinely envisioned Horizon Life.",
-          brain_insight: "Your learning gaps are specific and actionable.",
-          next_step: "Start with your three focus domains and your Horizon Goal within each."
-        };
-      }
+  sendMessage(text, suppressBubble = false) {
+    if (this.isWaiting) return;
+    this.isWaiting = true;
 
-      session.phase = "complete";
+    UI.clearInput();
+    UI.disableInput();
 
-      return res.json({
-        session,
-        phase: "complete",
-        phaseLabel: "Your Life OS Map",
-        complete: true,
-        mapData: synthData,
-        inputMode: "none"
-      });
+    const chatContainer = document.getElementById("chat-container");
+
+    if (!suppressBubble) {
+      const userBubble = UI.createUserMessage(text);
+      chatContainer.appendChild(userBubble);
+      UI.scrollToMessage(userBubble);
     }
 
-    // ── Placement confirmation ────────────────────────────────────────────────
-    if (session.phase === "placement_confirm") {
-      if (!session.domainData[domainId]) session.domainData[domainId] = {};
-      // Accept half-point corrections (e.g. "4.5", "7", "6.5")
-      const correctionMatch = userMessage.match(/\b(10|[0-9](?:\.[05])?)\b/);
-      if (correctionMatch) session.domainData[domainId].score = parseFloat(correctionMatch[1]);
+    const typingEl = UI.createTypingIndicator();
+    chatContainer.appendChild(typingEl);
+    UI.showTyping();
 
-      session.phase = "domain";
-      session.domainStep = "horizon";
-      session.probeCount = 0;
+    const messages = [{ role: "user", content: text }];
 
-      return res.json({
-        session,
-        phase: "domain",
-        phaseLabel: `${domain.label} — Horizon Goal`,
-        message: domain.horizonPrompt,
-        inputMode: "text"
+    this.callAPI(messages)
+      .then(data => {
+        UI.hideTyping();
+        this.handleAPIResponse(data);
+        this.isWaiting = false;
+      })
+      .catch(() => {
+        UI.hideTyping();
+        this.addAssistantMessage("Something went wrong. Please try again.");
+        UI.enableInput();
+        this.isWaiting = false;
       });
+  },
+
+  async callAPI(messages) {
+    const body = { messages, session: this.session };
+    const response = await fetch("/api/chat", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    return response.json();
+  },
+
+  handleAPIResponse(data) {
+    if (data.session) this.session = data.session;
+
+    const chatContainer = document.getElementById("chat-container");
+
+    if (data.phaseLabel) {
+      UI.updateProgress(data.phaseLabel);
     }
 
-    // ── Main domain flow ──────────────────────────────────────────────────────
-    if (session.phase === "domain") {
-      if (!session.domainData[domainId]) session.domainData[domainId] = {};
+    // Update live wheel whenever wheelData arrives
+    if (data.wheelData) {
+      this.updateWheel(data.wheelData);
+    }
 
-      // AVATAR — collect list
-      if (session.domainStep === "avatar") {
-        if (isThin(userMessage) && session.probeCount < 2) {
-          session.probeCount++;
-          return res.json({ session, phase: "domain", phaseLabel: `${domain.label} — Your 10`, message: thinnessResponse("avatar", session.probeCount - 1), inputMode: "text" });
+    // Domain readout card — shown after placement lands (placement_confirm phase)
+    if (data.phase === "placement_confirm" && data.wheelData) {
+      const completedDomain = data.wheelData.find(d => d.score !== null && d.score !== undefined);
+      // Find the most recently scored domain
+      const scored = data.wheelData.filter(d => d.score !== null);
+      if (scored.length > 0) {
+        const latest = scored[scored.length - 1];
+        const readoutEl = this.renderDomainReadout(latest);
+        if (readoutEl) {
+          // Insert before the message
+          chatContainer.appendChild(readoutEl);
+          setTimeout(() => readoutEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
         }
-
-        session.domainData[domainId].avatarList = userMessage;
-        session.domainStep = "avatar_synthesis";
-        session.probeCount = 0;
-
-        return res.json({
-          session,
-          phase: "domain",
-          phaseLabel: `${domain.label} — The Character`,
-          message: domain.avatarSynthesisPrompt,
-          inputMode: "text"
-        });
-      }
-
-      // AVATAR SYNTHESIS — extract character essence, Claude synthesises brief
-      if (session.domainStep === "avatar_synthesis") {
-        if (isThin(userMessage) && session.probeCount < 1) {
-          session.probeCount++;
-          return res.json({ session, phase: "domain", phaseLabel: `${domain.label} — The Character`, message: `What would be unmistakable about this character if they walked into a room? What's the one quality that ties all of them together?`, inputMode: "text" });
-        }
-
-        session.domainData[domainId].avatarCharacter = userMessage;
-
-        const synthResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 400,
-          messages: [{ role: "user", content: avatarSynthesisPrompt(session, domain) }]
-        });
-
-        let synthData;
-        try {
-          const raw = synthResponse.content[0].text.replace(/```json|```/g, "").trim();
-          synthData = JSON.parse(raw);
-        } catch {
-          synthData = { characterBrief: "Someone who embodies this domain at its fullest expression for someone like you." };
-        }
-
-        session.domainData[domainId].characterBrief = synthData.characterBrief;
-        session.probeCount = 0;
-
-        // Spark gets permission question before placement
-        if (domain.id === "spark") {
-          session.domainStep = "permission";
-          return res.json({
-            session,
-            phase: "domain",
-            phaseLabel: `${domain.label} — Permission`,
-            message: `${synthData.characterBrief}\n\nThat's your 10 in Spark.\n\n${domain.permissionPrompt}`,
-            inputMode: "text"
-          });
-        }
-
-        session.domainStep = "placement";
-        return res.json({
-          session,
-          phase: "domain",
-          phaseLabel: `${domain.label} — Where You Are`,
-          message: `${synthData.characterBrief}\n\nThat's your 10 in ${domain.label}.\n\n${domain.placementPrompt}`,
-          inputMode: "text"
-        });
-      }
-
-      // PERMISSION (Spark only) — acknowledge and move to placement
-      if (session.domainStep === "permission") {
-        session.domainData[domainId].permissionAnswer = userMessage;
-        session.domainStep = "placement";
-        session.probeCount = 0;
-
-        return res.json({
-          session,
-          phase: "domain",
-          phaseLabel: `${domain.label} — Where You Are`,
-          message: domain.placementPrompt,
-          inputMode: "text"
-        });
-      }
-
-      // PLACEMENT — collect, then Claude infers score
-      if (session.domainStep === "placement") {
-        if (isThin(userMessage) && session.probeCount < 2) {
-          session.probeCount++;
-          return res.json({ session, phase: "domain", phaseLabel: `${domain.label} — Where You Are`, message: thinnessResponse("placement", session.probeCount - 1), inputMode: "text" });
-        }
-
-        session.currentPlacement = userMessage;
-        session.domainData[domainId].placement = userMessage;
-
-        const inferResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          messages: [{ role: "user", content: placementInferencePrompt(session, domain) }]
-        });
-
-        let inferData;
-        try {
-          const raw = inferResponse.content[0].text.replace(/```json|```/g, "").trim();
-          inferData = JSON.parse(raw);
-        } catch {
-          inferData = { score: 5, tier: "Plateau", reflection: "Here's what I'm reading from what you've shared.", invite_correction: "Does this feel accurate?" };
-        }
-
-        session.domainData[domainId].score = inferData.score;
-        session.domainData[domainId].tier  = inferData.tier || "";
-        session.phase = "placement_confirm";
-        session.domainStep = "horizon";
-        session.probeCount = 0;
-
-        const tierLabel = inferData.tier ? ` — ${inferData.tier}` : "";
-        return res.json({
-          session,
-          phase: "placement_confirm",
-          phaseLabel: `${domain.label} — Placement`,
-          message: `${inferData.reflection}\n\nI'm reading you at ${inferData.score}/10 in ${domain.label}${tierLabel}.\n\n${inferData.invite_correction}`,
-          inputMode: "text"
-        });
-      }
-
-      // HORIZON GOAL — genie question + calibration probe
-      if (session.domainStep === "horizon") {
-        if (isThin(userMessage) && session.probeCount < 1) {
-          session.probeCount++;
-          return res.json({ session, phase: "domain", phaseLabel: `${domain.label} — Horizon Goal`, message: thinnessResponse("horizon", 0), inputMode: "text" });
-        }
-
-        // Calibration probe — catches Avatar conflation (runs once per domain)
-        if (!session.domainData[domainId].horizonCalibrated) {
-          session.domainData[domainId].horizonCalibrated = true;
-          session.domainData[domainId].horizonDraft = userMessage;
-
-          return res.json({
-            session,
-            phase: "domain",
-            phaseLabel: `${domain.label} — Horizon Goal`,
-            message: `If you woke up tomorrow with that granted — what's the first thing you'd notice was different? What would your actual day look like?\n\nSometimes the wish and the character are the same thing. Sometimes they're not. Just want to make sure we have the real one.`,
-            inputMode: "text"
-          });
-        }
-
-        // Store final Horizon Goal
-        session.domainData[domainId].horizon = userMessage;
-
-        const nextIndex = session.domainIndex + 1;
-
-        // All seven done — Brain synthesis question
-        if (nextIndex >= DOMAINS.length) {
-          session.phase = "brain";
-          return res.json({
-            session,
-            phase: "brain",
-            phaseLabel: "Brain — The Synthesis Question",
-            message: BRAIN_PROMPT,
-            inputMode: "text"
-          });
-        }
-
-        // Next domain
-        session.domainIndex = nextIndex;
-        session.domainStep = "avatar";
-        session.phase = "domain";
-        session.probeCount = 0;
-
-        const nextDomain = DOMAINS[nextIndex];
-        const transitions = ["Good.", "Moving.", "Understood.", "With you.", "Noted.", "Continuing."];
-        const transition = transitions[nextIndex - 1] || "";
-
-        return res.json({
-          session,
-          phase: "domain",
-          phaseLabel: `${nextDomain.label} — ${nextIndex + 1} of 7`,
-          message: `${transition}\n\n${nextDomain.avatarPrompt}`,
-          inputMode: "text"
-        });
       }
     }
 
-    return res.json({ session, phase: session.phase, message: "Let's keep going.", inputMode: "text" });
+    // Final map — special rendering
+    if (data.complete && data.mapData) {
+      const mapEl = this.renderFinalMap(data.mapData, data.session, data.wheelData);
+      chatContainer.appendChild(mapEl);
+      setTimeout(() => mapEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      UI.setInputMode("none");
+      return;
+    }
 
-  } catch (err) {
-    console.error("Life OS engine error:", err);
-    return res.status(500).json({ error: "Something went wrong. Please try again." });
+    // Regular message
+    if (data.message) {
+      const msgEl = UI.createAssistantMessage(data.message);
+      chatContainer.appendChild(msgEl);
+      setTimeout(() => msgEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }
+
+    UI.setInputMode(data.complete ? "none" : (data.inputMode || "text"));
+  },
+
+  // ─── Domain readout card ───────────────────────────────────────────────────
+  renderDomainReadout(domain) {
+    if (!domain || domain.score === null) return null;
+    const score = domain.score;
+    const scoreColor = score <= 3 ? "var(--score-red)" : score <= 5 ? "var(--score-orange)" : score <= 7 ? "var(--score-amber)" : "var(--score-green)";
+
+    const el = document.createElement("div");
+    el.className = "domain-readout";
+    el.innerHTML = `
+      <div class="domain-readout-inner">
+        <div class="domain-readout-label">${domain.label}</div>
+        <div class="domain-readout-score" style="color:${scoreColor}">${score}<span class="domain-readout-denom">/10</span></div>
+        <div class="domain-readout-tier">${domain.tier}</div>
+        ${domain.horizonScore ? `<div class="domain-readout-horizon">Horizon: ${domain.horizonScore}</div>` : ""}
+      </div>`;
+    return el;
+  },
+
+  // ─── Live wheel renderer ───────────────────────────────────────────────────
+  updateWheel(wheelData) {
+    const container = document.getElementById("wheel-container");
+    const canvas    = document.getElementById("domain-wheel");
+    const legend    = document.getElementById("wheel-legend");
+    if (!container || !canvas) return;
+
+    // Show wheel once first domain scores
+    const hasAnyScore = wheelData.some(d => d.score !== null);
+    if (!hasAnyScore) return;
+    container.style.display = "flex";
+
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+    const maxR = 110;
+    const domains = wheelData;
+    const n = domains.length;
+    const angleStep = (Math.PI * 2) / n;
+    const startAngle = -Math.PI / 2; // top
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Background rings (gossamer) ──
+    const goldRing = "rgba(200,169,110,0.12)";
+    for (let ring = 2; ring <= 10; ring += 2) {
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const angle = startAngle + i * angleStep;
+        const r = (ring / 10) * maxR;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = goldRing;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // ── Spokes ──
+    for (let i = 0; i < n; i++) {
+      const angle = startAngle + i * angleStep;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
+      ctx.strokeStyle = "rgba(200,169,110,0.15)";
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // ── Horizon goal outline (dashed, gold) ──
+    const horizonPoints = domains.map((d, i) => {
+      const angle = startAngle + i * angleStep;
+      const r = d.horizonScore !== null ? (d.horizonScore / 10) * maxR : 0;
+      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), hasData: d.horizonScore !== null };
+    });
+
+    const horizonWithData = horizonPoints.filter(p => p.hasData);
+    if (horizonWithData.length >= 2) {
+      ctx.beginPath();
+      ctx.setLineDash([3, 4]);
+      horizonPoints.forEach((p, i) => {
+        if (!p.hasData) return;
+        i === 0 || !horizonPoints[i - 1]?.hasData ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+      });
+      if (horizonWithData.length === n) ctx.closePath();
+      ctx.strokeStyle = "rgba(200,169,110,0.45)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // ── Current placement filled shape ──
+    const placedPoints = domains.map((d, i) => {
+      const angle = startAngle + i * angleStep;
+      const r = d.score !== null ? (d.score / 10) * maxR : 0;
+      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), hasData: d.score !== null };
+    });
+
+    const placedWithData = placedPoints.filter(p => p.hasData);
+    if (placedWithData.length > 0) {
+      ctx.beginPath();
+      let firstMoved = false;
+      placedPoints.forEach((p, i) => {
+        if (d => d.score === null) {
+          // still draw to centre for unfilled domains to keep shape
+        }
+        if (!firstMoved) { ctx.moveTo(p.x, p.y); firstMoved = true; }
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+      ctx.fillStyle = "rgba(200,169,110,0.12)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(200,169,110,0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // ── Score nodes ──
+    domains.forEach((d, i) => {
+      if (d.score === null) return;
+      const angle = startAngle + i * angleStep;
+      const r = (d.score / 10) * maxR;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#C8922A";
+      ctx.fill();
+    });
+
+    // ── Domain labels ──
+    const labelR = maxR + 18;
+    ctx.font = "500 10px Georgia, serif";
+    ctx.fillStyle = "rgba(26,26,26,0.75)";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    domains.forEach((d, i) => {
+      const angle = startAngle + i * angleStep;
+      const x = cx + labelR * Math.cos(angle);
+      const y = cy + labelR * Math.sin(angle);
+
+      // Adjust alignment for left/right sides
+      if (angle > Math.PI * 0.15 && angle < Math.PI * 0.85) ctx.textAlign = "left";
+      else if (angle > -Math.PI * 0.85 && angle < -Math.PI * 0.15) ctx.textAlign = "right";
+      else ctx.textAlign = "center";
+
+      // Bold if scored
+      ctx.font = d.score !== null ? "600 10px Georgia, serif" : "400 10px Georgia, serif";
+      ctx.fillStyle = d.score !== null ? "rgba(200,169,110,0.9)" : "rgba(26,26,26,0.35)";
+      ctx.fillText(d.label, x, y);
+    });
+
+    // Update legend
+    if (legend) {
+      const scored = wheelData.filter(d => d.score !== null);
+      legend.innerHTML = scored.map(d => `
+        <div class="wheel-legend-item">
+          <span class="wheel-legend-dot" style="background:${d.score <= 3 ? "var(--score-red)" : d.score <= 5 ? "var(--score-orange)" : d.score <= 7 ? "var(--score-amber)" : "var(--score-green)"}"></span>
+          <span class="wheel-legend-name">${d.label}</span>
+          <span class="wheel-legend-score">${d.score}</span>
+        </div>`).join("");
+    }
+  },
+
+  renderFinalMap(mapData, session, wheelData) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "message message-profile";
+
+    const domainOrder = ["path", "spark", "body", "finances", "relationships", "inner_game", "outer_game"];
+
+    const domainLabels = {
+      path:          "Path",
+      spark:         "Spark",
+      body:          "Body",
+      finances:      "Finances",
+      relationships: "Relationships",
+      inner_game:    "Inner Game",
+      outer_game:    "Outer Game"
+    };
+
+    const domainQuestions = {
+      path:          "Am I on my path — and actually moving?",
+      spark:         "Is the fire on?",
+      body:          "How is this living system doing?",
+      finances:      "Do I have the agency to act on what matters?",
+      relationships: "Am I truly known by anyone?",
+      inner_game:    "Are my stories tending me, or running me?",
+      outer_game:    "Is what I'm broadcasting aligned with who I actually am?"
+    };
+
+    const domainFractals = {
+      path:          "Vision",
+      spark:         "Human Being",
+      body:          "Nature",
+      finances:      "Finance & Economy",
+      relationships: "Society",
+      inner_game:    "Legacy",
+      outer_game:    "Society"
+    };
+
+    const domainData  = session?.domainData || {};
+    const focusDomains = mapData.focus_domains || [];
+
+    const scoreRows = domainOrder.map(id => {
+      const data = domainData[id];
+      if (!data) return "";
+      const isFocus  = focusDomains.includes(id);
+      const score    = data.score || 0;
+      const barWidth = (score / 10) * 100;
+      const barColor = score <= 3 ? "var(--score-red)" : score <= 5 ? "var(--score-orange)" : score <= 7 ? "var(--score-amber)" : "var(--score-green)";
+      return `
+        <div class="map-domain-row ${isFocus ? "map-domain-focus" : ""}">
+          <div class="map-domain-info">
+            <div class="map-domain-name">${isFocus ? "▸ " : ""}${domainLabels[id]}</div>
+            <div class="map-domain-thesis">${domainQuestions[id]}</div>
+          </div>
+          <div class="map-domain-bar-wrap">
+            <div class="map-domain-bar" style="width:${barWidth}%;background:${barColor};"></div>
+          </div>
+          <div class="map-domain-right">
+            <div class="map-domain-score">${score}/10</div>
+            <div class="map-domain-fractal">${domainFractals[id]}</div>
+          </div>
+          ${isFocus ? '<div class="map-focus-tag">focus</div>' : ""}
+        </div>`;
+    }).join("");
+
+    wrapper.innerHTML = `
+      <div class="profile-card">
+        <div class="profile-hero">
+          <div class="profile-card-heading">Your Life OS Map</div>
+          <div class="map-stage-badge">${mapData.stage}</div>
+          <div class="map-stage-desc">${mapData.stage_description}</div>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section-label">Your Seven Domains</div>
+          <div class="map-domains">${scoreRows}</div>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section-label">What The Pattern Shows</div>
+          <p>${mapData.overall_reflection.replace(/\n\n/g, "</p><p>")}</p>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section-label">Your Three Focus Domains</div>
+          <p>${focusDomains.map(id => domainLabels[id] || id).join("  ·  ")}</p>
+          <p style="margin-top:10px;color:#8fa8be;font-size:0.92rem;">${mapData.focus_reasoning}</p>
+        </div>
+
+        ${mapData.brain_insight ? `
+        <div class="profile-section">
+          <div class="profile-section-label">What To Learn</div>
+          <p style="color:#c8d8e8;font-size:0.92rem;">${mapData.brain_insight}</p>
+        </div>` : ""}
+
+        <div class="profile-closing">
+          ${mapData.next_step}
+        </div>
+      </div>`;
+
+    return wrapper;
+  },
+
+  addAssistantMessage(text) {
+    const chatContainer = document.getElementById("chat-container");
+    const el = UI.createAssistantMessage(text);
+    chatContainer.appendChild(el);
+    UI.scrollToMessage(el);
+    UI.enableInput();
   }
 };
+
+document.addEventListener("DOMContentLoaded", () => App.init());
+window.App = App;
