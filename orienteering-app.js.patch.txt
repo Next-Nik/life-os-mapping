@@ -1,0 +1,12 @@
+// LIFE OS: ORIENTEERING — APP LOGIC
+// NOTE: Only the carousel start-button label has changed in this file.
+// The rest of the app.js logic for Orienteering was not uploaded —
+// apply this single change to your existing Orienteering app.js:
+//
+// FIND:
+//   arrow.outerHTML = `<button class="carousel-begin" id="carousel-arrow">Find where you fit</button>`;
+//
+// REPLACE WITH:
+//   arrow.outerHTML = `<button class="carousel-begin" id="carousel-arrow">Start your map</button>`;
+//
+// "Find where you fit" is Purpose Piece's CTA. Orienteering's is about mapping, not fitting.

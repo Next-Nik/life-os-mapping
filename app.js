@@ -1,48 +1,58 @@
-// LIFE OS — APP LOGIC v3
+// PURPOSE PIECE — APP LOGIC
 // Session management, API communication, event handling.
-// Seven domains: Path, Spark, Body, Finances, Relationships, Inner Game, Outer Game
+// Depends on ui.js (loaded first via index.html).
 
 const App = {
   session: null,
-  isWaiting: false,
+  currentPhase: null,
+  currentOptions: null,  // current button options if in button mode
+  isWaiting: false,      // prevent double-sends
 
+  // ─── Init ──────────────────────────────────────────────────────────────────
   init() {
     this.bindEvents();
   },
 
   bindEvents() {
+    const sendBtn = document.getElementById("send-btn");
+    const input   = document.getElementById("user-input");
+    // Carousel — arrow advances slides, dots show position, last slide swaps arrow for Begin
     let currentSlide = 0;
     const totalSlides = 3;
-    const track = document.getElementById("carousel-track");
-    const arrow = document.getElementById("carousel-arrow");
-    const dots  = document.querySelectorAll(".carousel-dot");
+    const track  = document.getElementById("carousel-track");
+    const arrow  = document.getElementById("carousel-arrow");
+    const dots   = document.querySelectorAll(".carousel-dot");
 
     const advanceCarousel = () => {
       currentSlide++;
       track.style.transform = `translateX(-${currentSlide * 33.333}%)`;
+
+      // Update dots
       dots.forEach((d, i) => d.classList.toggle("active", i === currentSlide));
 
+      // On last slide: swap arrow for Begin text button
       if (currentSlide === totalSlides - 1) {
-        const beginBtn = document.createElement("button");
-        beginBtn.className = "carousel-begin";
-        beginBtn.textContent = "Begin your map";
-        beginBtn.addEventListener("click", () => this.startConversation());
-        arrow.parentNode.replaceChild(beginBtn, arrow);
+        arrow.outerHTML = `<button class="carousel-begin" id="carousel-arrow">Find where you fit</button>`;
+        document.getElementById("carousel-arrow").addEventListener("click", () => this.startConversation());
       }
     };
 
-    if (arrow) arrow.addEventListener("click", advanceCarousel);
+    if (arrow) {
+      arrow.addEventListener("click", advanceCarousel);
+    }
 
-    const sendBtn = document.getElementById("send-btn");
-    const input   = document.getElementById("user-input");
-
-    if (sendBtn) sendBtn.addEventListener("click", () => this.sendUserInput());
+    if (sendBtn) {
+      sendBtn.addEventListener("click", () => this.sendUserInput());
+    }
 
     if (input) {
+      // Auto-grow textarea
       input.addEventListener("input", () => {
         input.style.height = "auto";
         input.style.height = Math.min(input.scrollHeight, 120) + "px";
       });
+
+      // Enter to send (shift+enter for newline)
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
@@ -52,6 +62,7 @@ const App = {
     }
   },
 
+  // ─── Start ─────────────────────────────────────────────────────────────────
   async startConversation() {
     UI.hideWelcome();
     UI.showChat();
@@ -59,26 +70,33 @@ const App = {
     const chatContainer = document.getElementById("chat-container");
     const typingEl = UI.createTypingIndicator();
     chatContainer.appendChild(typingEl);
+    UI.showTyping();
     UI.scrollToBottom();
 
     try {
       const data = await this.callAPI([]);
+
       UI.hideTyping();
-      this.handleAPIResponse(data);
+      this.handleAPIResponse(data, true);
     } catch (err) {
       UI.hideTyping();
-      this.addAssistantMessage("Something went wrong. Please refresh and try again.");
+      this.addAssistantMessage("Something went wrong getting started. Please refresh and try again.");
     }
   },
 
+  // ─── Send user input ────────────────────────────────────────────────────────
   sendUserInput() {
     if (this.isWaiting) return;
+
     const input = document.getElementById("user-input");
     const text  = input ? input.value.trim() : "";
     if (!text) return;
+
     this.sendMessage(text);
   },
 
+  // Called by option button clicks and by direct text input
+  // suppressBubble: true when caller has already rendered the user message (e.g. button handler)
   sendMessage(text, suppressBubble = false) {
     if (this.isWaiting) return;
     this.isWaiting = true;
@@ -88,16 +106,19 @@ const App = {
 
     const chatContainer = document.getElementById("chat-container");
 
+    // Show user bubble (skip if caller already rendered it)
     if (!suppressBubble) {
       const userBubble = UI.createUserMessage(text);
       chatContainer.appendChild(userBubble);
       UI.scrollToMessage(userBubble);
     }
 
+    // Show typing
     const typingEl = UI.createTypingIndicator();
     chatContainer.appendChild(typingEl);
     UI.showTyping();
 
+    // Build messages array (simple — just the latest user message)
     const messages = [{ role: "user", content: text }];
 
     this.callAPI(messages)
@@ -114,331 +135,234 @@ const App = {
       });
   },
 
+  // ─── API call ───────────────────────────────────────────────────────────────
   async callAPI(messages) {
     const body = { messages, session: this.session };
+
     const response = await fetch("/api/chat", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body)
     });
-    if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
     return response.json();
   },
 
-  handleAPIResponse(data) {
+  // ─── Handle API response ────────────────────────────────────────────────────
+  handleAPIResponse(data, isFirst = false) {
     if (data.session) this.session = data.session;
 
     const chatContainer = document.getElementById("chat-container");
 
-    if (data.phaseLabel) {
-      UI.updateProgress(data.phaseLabel);
+    // Phase transition divider (when phase changes)
+    if (data.phase && data.phase !== this.currentPhase) {
+      if (this.currentPhase !== null && data.phaseLabel) {
+        const divider = UI.createPhaseDivider(data.phaseLabel);
+        chatContainer.appendChild(divider);
+      }
+      this.currentPhase = data.phase;
     }
 
-    // Update live wheel whenever wheelData arrives
-    if (data.wheelData) {
-      this.updateWheel(data.wheelData);
+    // Update progress bar
+    if (data.phase !== undefined) {
+      UI.updateProgress(data.phase, data.phaseLabel);
     }
 
-    // Domain readout card — shown after placement lands (placement_confirm phase)
-    if (data.phase === "placement_confirm" && data.wheelData) {
-      const completedDomain = data.wheelData.find(d => d.score !== null && d.score !== undefined);
-      // Find the most recently scored domain
-      const scored = data.wheelData.filter(d => d.score !== null);
-      if (scored.length > 0) {
-        const latest = scored[scored.length - 1];
-        const readoutEl = this.renderDomainReadout(latest);
-        if (readoutEl) {
-          // Insert before the message
-          chatContainer.appendChild(readoutEl);
-          setTimeout(() => readoutEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-        }
+    // Assistant message
+    if (data.message) {
+      // Ritual threshold: section break + question header before Phase 1 questions
+      if (data.questionLabel) {
+        const hr = document.createElement("hr");
+        hr.className = "section-break";
+        chatContainer.appendChild(hr);
+
+        const header = document.createElement("div");
+        header.className = "question-header";
+        header.textContent = data.questionLabel;
+        chatContainer.appendChild(header);
+      }
+
+      const isSynthesis = data.phase === "synthesis";
+
+      // Synthesis with sections — render gold headers
+      if (isSynthesis && data.sections) {
+        const sectionOrder = [
+          { key: "your_signal",  label: "Your Signal" },
+          { key: "your_engine",  label: "Your Engine" },
+          { key: "your_calling", label: "Your Calling" },
+          { key: "the_cost",     label: "The Cost" }
+        ];
+        const wrapper = document.createElement("div");
+        wrapper.className = "message message-synthesis-mirror";
+        const heading = document.createElement("div");
+        heading.className = "synthesis-heading";
+        heading.textContent = "Initial Reflection";
+        wrapper.appendChild(heading);
+        const intro = document.createElement("div");
+        intro.className = "synthesis-intro";
+        intro.textContent = "Here's what the pattern in your answers is telling me.";
+        wrapper.appendChild(intro);
+        sectionOrder.forEach(({ key, label }) => {
+          const text = data.sections[key];
+          if (!text) return;
+          const section = document.createElement("div");
+          section.className = "synthesis-section";
+          section.innerHTML = `<div class="synthesis-section-label">${label}</div><p>${text}</p>`;
+          wrapper.appendChild(section);
+        });
+        chatContainer.appendChild(wrapper);
+        setTimeout(() => wrapper.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      } else {
+        const msgEl = UI.createAssistantMessage(data.message, isSynthesis);
+        chatContainer.appendChild(msgEl);
+        setTimeout(() => msgEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
       }
     }
 
-    // Final map — special rendering
-    if (data.complete && data.mapData) {
-      const mapEl = this.renderFinalMap(data.mapData, data.session, data.wheelData);
-      chatContainer.appendChild(mapEl);
-      setTimeout(() => mapEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    // nextMessage: post-probe-3 case — acknowledgment arrived first, now render the question
+    if (data.nextMessage) {
+      setTimeout(() => {
+        const msgEl = UI.createAssistantMessage(data.nextMessage);
+        chatContainer.appendChild(msgEl);
+        setTimeout(() => msgEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      }, 600);
+    }
+
+    // Option buttons (if inputMode is "buttons" and options provided)
+    if (data.inputMode === "buttons" && data.options && data.options.length > 0) {
+      this.currentOptions = data.options;
+      const buttonsEl = UI.createOptionButtons(data.options, (id, text) => {
+        // Show full option text in the chat bubble for context.
+        // Send only the letter to the engine — prevents false multi-letter detection.
+        const displayText = `${id.toUpperCase()}) ${text}`;
+        const chatContainer = document.getElementById("chat-container");
+        const userBubble = UI.createUserMessage(displayText);
+        chatContainer.appendChild(userBubble);
+        UI.scrollToMessage(userBubble);
+        this.sendMessage(id.toUpperCase(), true); // suppressBubble — display bubble already rendered above
+      });
+      chatContainer.appendChild(buttonsEl);
+      UI.scrollToMessage(buttonsEl);
+    }
+
+    // Set input mode
+    if (data.complete) {
       UI.setInputMode("none");
+    } else {
+      UI.setInputMode(data.inputMode || "text");
+    }
+
+    // Auto-advance handling — three phases use this
+    if (data.autoAdvance) {
+      const delay = data.advanceDelay || 500;
+      UI.setInputMode("none");
+
+      if (data.phase === "welcome") {
+        // Welcome → Q1: brief pause then fire Q1
+        setTimeout(() => {
+          const typingEl = UI.createTypingIndicator();
+          chatContainer.appendChild(typingEl);
+          UI.scrollToMessage(typingEl);
+          App.callAPI([]).then(q1data => {
+            typingEl.remove();
+            App.handleAPIResponse(q1data);
+          }).catch(e => {
+            typingEl.remove();
+            console.error("Welcome auto-advance error:", e);
+          });
+        }, delay);
+
+      } else if (data.phase === "thinking") {
+        // Thinking → synthesis: show animated dots, fire API, dots disappear when synthesis arrives
+        setTimeout(() => {
+          const typingEl = UI.createTypingIndicator();
+          chatContainer.appendChild(typingEl);
+          UI.scrollToMessage(typingEl);
+          App.callAPI([]).then(synthData => {
+            typingEl.remove();
+            App.handleAPIResponse(synthData);
+          }).catch(e => {
+            typingEl.remove();
+            console.error("Synthesis auto-advance error:", e);
+          });
+        }, delay);
+
+      } else if (data.phase === "synthesis") {
+        // Synthesis → profile: pause, show bridge message + dots, fire API, both disappear when profile arrives
+        setTimeout(() => {
+          const bridgeEl = UI.createAssistantMessage("Building your profile now...");
+          chatContainer.appendChild(bridgeEl);
+          UI.scrollToMessage(bridgeEl);
+
+          const typingEl = UI.createTypingIndicator();
+          chatContainer.appendChild(typingEl);
+          UI.scrollToMessage(typingEl);
+
+          App.callAPI([]).then(p4data => {
+            typingEl.remove();
+            bridgeEl.remove();
+            App.handleAPIResponse(p4data);
+          }).catch(e => {
+            typingEl.remove();
+            bridgeEl.remove();
+            console.error("Profile auto-advance error:", e);
+          });
+        }, delay);
+      }
+    }
+  },
+
+  // ─── Go Deeper — threshold CTA ──────────────────────────────────────────────
+  goDeeper() {
+    // Store the completed session so deep.html can pick it up
+    try {
+      sessionStorage.setItem('pp_first_look', JSON.stringify(this.session));
+    } catch(e) {
+      console.warn('sessionStorage unavailable:', e);
+    }
+
+    // Gate check — set pp_deep_unlocked to 'true' to bypass
+    const unlocked = localStorage.getItem('pp_deep_unlocked') === 'true';
+    if (!unlocked) {
+      this.showDeepGate();
       return;
     }
 
-    // Regular message
-    if (data.message) {
-      const msgEl = UI.createAssistantMessage(data.message);
-      chatContainer.appendChild(msgEl);
-      setTimeout(() => msgEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    }
-
-    UI.setInputMode(data.complete ? "none" : (data.inputMode || "text"));
+    window.location.href = '/deep';
   },
 
-  // ─── Domain readout card ───────────────────────────────────────────────────
-  renderDomainReadout(domain) {
-    if (!domain || domain.score === null) return null;
-    const score = domain.score;
-    const scoreColor = score <= 3 ? "var(--score-red)" : score <= 5 ? "var(--score-orange)" : score <= 7 ? "var(--score-amber)" : "var(--score-green)";
+  showDeepGate() {
+    // Remove any existing gate
+    const existing = document.getElementById('deep-gate-overlay');
+    if (existing) existing.remove();
 
-    const el = document.createElement("div");
-    el.className = "domain-readout";
-    el.innerHTML = `
-      <div class="domain-readout-inner">
-        <div class="domain-readout-label">${domain.label}</div>
-        <div class="domain-readout-score" style="color:${scoreColor}">${score}<span class="domain-readout-denom">/10</span></div>
-        <div class="domain-readout-tier">${domain.tier}</div>
-        ${domain.horizonScore ? `<div class="domain-readout-horizon">Horizon: ${domain.horizonScore}</div>` : ""}
-      </div>`;
-    return el;
+    const overlay = document.createElement('div');
+    overlay.id = 'deep-gate-overlay';
+    overlay.className = 'deep-gate-overlay';
+    overlay.innerHTML = `
+      <div class="deep-gate-card">
+        <div class="deep-gate-eyebrow">Go Deeper</div>
+        <h2 class="deep-gate-heading">The tension. The shadow. The full picture.</h2>
+        <p class="deep-gate-body">The First Look gave you the shape. The Deep Dive is a real conversation — into what this pattern costs you, where it breaks, and what it's been asking of you. You leave knowing not just what you are, but what that fully asks.</p>
+        <button class="deep-gate-cta" onclick="App.unlockDeep()">Unlock the Deep Dive</button>
+        <button class="deep-gate-dismiss" onclick="document.getElementById('deep-gate-overlay').remove()">Not now</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
   },
 
-  // ─── Live wheel renderer ───────────────────────────────────────────────────
-  updateWheel(wheelData) {
-    const container = document.getElementById("wheel-container");
-    const canvas    = document.getElementById("domain-wheel");
-    const legend    = document.getElementById("wheel-legend");
-    if (!container || !canvas) return;
-
-    // Show wheel once first domain scores
-    const hasAnyScore = wheelData.some(d => d.score !== null);
-    if (!hasAnyScore) return;
-    container.style.display = "flex";
-
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width;
-    const H = canvas.height;
-    const cx = W / 2;
-    const cy = H / 2;
-    const maxR = 110;
-    const domains = wheelData;
-    const n = domains.length;
-    const angleStep = (Math.PI * 2) / n;
-    const startAngle = -Math.PI / 2; // top
-
-    ctx.clearRect(0, 0, W, H);
-
-    // ── Background rings (gossamer) ──
-    const goldRing = "rgba(200,146,42,0.12)";
-    for (let ring = 2; ring <= 10; ring += 2) {
-      ctx.beginPath();
-      for (let i = 0; i < n; i++) {
-        const angle = startAngle + i * angleStep;
-        const r = (ring / 10) * maxR;
-        const x = cx + r * Math.cos(angle);
-        const y = cy + r * Math.sin(angle);
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = goldRing;
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-    }
-
-    // ── Spokes ──
-    for (let i = 0; i < n; i++) {
-      const angle = startAngle + i * angleStep;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
-      ctx.strokeStyle = "rgba(200,146,42,0.15)";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-    }
-
-    // ── Horizon goal outline (dashed, gold) ──
-    const horizonPoints = domains.map((d, i) => {
-      const angle = startAngle + i * angleStep;
-      const r = d.horizonScore !== null ? (d.horizonScore / 10) * maxR : 0;
-      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), hasData: d.horizonScore !== null };
-    });
-
-    const horizonWithData = horizonPoints.filter(p => p.hasData);
-    if (horizonWithData.length >= 2) {
-      ctx.beginPath();
-      ctx.setLineDash([3, 4]);
-      horizonPoints.forEach((p, i) => {
-        if (!p.hasData) return;
-        i === 0 || !horizonPoints[i - 1]?.hasData ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
-      });
-      if (horizonWithData.length === n) ctx.closePath();
-      ctx.strokeStyle = "rgba(200,146,42,0.45)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // ── Current placement filled shape ──
-    const placedPoints = domains.map((d, i) => {
-      const angle = startAngle + i * angleStep;
-      const r = d.score !== null ? (d.score / 10) * maxR : 0;
-      return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), hasData: d.score !== null };
-    });
-
-    const placedWithData = placedPoints.filter(p => p.hasData);
-    if (placedWithData.length > 0) {
-      ctx.beginPath();
-      let firstMoved = false;
-      placedPoints.forEach((p, i) => {
-        if (!firstMoved) { ctx.moveTo(p.x, p.y); firstMoved = true; }
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.closePath();
-      ctx.fillStyle = "rgba(200,146,42,0.12)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(200,146,42,0.7)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-
-    // ── Score nodes ──
-    domains.forEach((d, i) => {
-      if (d.score === null) return;
-      const angle = startAngle + i * angleStep;
-      const r = (d.score / 10) * maxR;
-      const x = cx + r * Math.cos(angle);
-      const y = cy + r * Math.sin(angle);
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = "#C8922A";
-      ctx.fill();
-    });
-
-    // ── Domain labels ──
-    const labelR = maxR + 18;
-    ctx.font = "500 10px Georgia, serif";
-    ctx.fillStyle = "rgba(26,26,26,0.75)";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    domains.forEach((d, i) => {
-      const angle = startAngle + i * angleStep;
-      const x = cx + labelR * Math.cos(angle);
-      const y = cy + labelR * Math.sin(angle);
-
-      // Adjust alignment for left/right sides
-      if (angle > Math.PI * 0.15 && angle < Math.PI * 0.85) ctx.textAlign = "left";
-      else if (angle > -Math.PI * 0.85 && angle < -Math.PI * 0.15) ctx.textAlign = "right";
-      else ctx.textAlign = "center";
-
-      // Bold if scored
-      ctx.font = d.score !== null ? "600 10px Georgia, serif" : "400 10px Georgia, serif";
-      ctx.fillStyle = d.score !== null ? "rgba(200,146,42,0.9)" : "rgba(26,26,26,0.35)";
-      ctx.fillText(d.label, x, y);
-    });
-
-    // Update legend
-    if (legend) {
-      const scored = wheelData.filter(d => d.score !== null);
-      legend.innerHTML = scored.map(d => `
-        <div class="wheel-legend-item">
-          <span class="wheel-legend-dot" style="background:${d.score <= 3 ? "var(--score-red)" : d.score <= 5 ? "var(--score-orange)" : d.score <= 7 ? "var(--score-amber)" : "var(--score-green)"}"></span>
-          <span class="wheel-legend-name">${d.label}</span>
-          <span class="wheel-legend-score">${d.score}</span>
-        </div>`).join("");
-    }
+  // Temporary unlock for development — replace with Stripe webhook in production
+  unlockDeep() {
+    localStorage.setItem('pp_deep_unlocked', 'true');
+    document.getElementById('deep-gate-overlay')?.remove();
+    window.location.href = '/deep';
   },
 
-  renderFinalMap(mapData, session, wheelData) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "message message-profile";
-
-    const domainOrder = ["path", "spark", "body", "finances", "relationships", "inner_game", "outer_game"];
-
-    const domainLabels = {
-      path:          "Path",
-      spark:         "Spark",
-      body:          "Body",
-      finances:      "Finances",
-      relationships: "Relationships",
-      inner_game:    "Inner Game",
-      outer_game:    "Outer Game"
-    };
-
-    const domainQuestions = {
-      path:          "Am I on my path — and actually moving?",
-      spark:         "Is the fire on?",
-      body:          "How is this living system doing?",
-      finances:      "Do I have the agency to act on what matters?",
-      relationships: "Am I truly known by anyone?",
-      inner_game:    "Are my stories tending me, or running me?",
-      outer_game:    "Is what I'm broadcasting aligned with who I actually am?"
-    };
-
-    const domainFractals = {
-      path:          "Vision",
-      spark:         "Human Being",
-      body:          "Nature",
-      finances:      "Finance & Economy",
-      relationships: "Society",
-      inner_game:    "Legacy",
-      outer_game:    "Society"
-    };
-
-    const domainData  = session?.domainData || {};
-    const focusDomains = mapData.focus_domains || [];
-
-    const scoreRows = domainOrder.map(id => {
-      const data = domainData[id];
-      if (!data) return "";
-      const isFocus  = focusDomains.includes(id);
-      const score    = data.score || 0;
-      const barWidth = (score / 10) * 100;
-      const barColor = score <= 3 ? "var(--score-red)" : score <= 5 ? "var(--score-orange)" : score <= 7 ? "var(--score-amber)" : "var(--score-green)";
-      return `
-        <div class="map-domain-row ${isFocus ? "map-domain-focus" : ""}">
-          <div class="map-domain-info">
-            <div class="map-domain-name">${isFocus ? "▸ " : ""}${domainLabels[id]}</div>
-            <div class="map-domain-thesis">${domainQuestions[id]}</div>
-          </div>
-          <div class="map-domain-bar-wrap">
-            <div class="map-domain-bar" style="width:${barWidth}%;background:${barColor};"></div>
-          </div>
-          <div class="map-domain-right">
-            <div class="map-domain-score">${score}/10</div>
-            <div class="map-domain-fractal">${domainFractals[id]}</div>
-          </div>
-          ${isFocus ? '<div class="map-focus-tag">focus</div>' : ""}
-        </div>`;
-    }).join("");
-
-    wrapper.innerHTML = `
-      <div class="profile-card">
-        <div class="profile-hero">
-          <div class="profile-card-heading">Your Life OS Map</div>
-          <div class="map-stage-badge">${mapData.stage}</div>
-          <div class="map-stage-desc">${mapData.stage_description}</div>
-        </div>
-
-        <div class="profile-section">
-          <div class="profile-section-label">Your Seven Domains</div>
-          <div class="map-domains">${scoreRows}</div>
-        </div>
-
-        <div class="profile-section">
-          <div class="profile-section-label">What The Pattern Shows</div>
-          <p>${mapData.overall_reflection.replace(/\n\n/g, "</p><p>")}</p>
-        </div>
-
-        <div class="profile-section">
-          <div class="profile-section-label">Your Three Focus Domains</div>
-          <p>${focusDomains.map(id => domainLabels[id] || id).join("  ·  ")}</p>
-          <p style="margin-top:10px;color:#8fa8be;font-size:0.92rem;">${mapData.focus_reasoning}</p>
-        </div>
-
-        ${mapData.brain_insight ? `
-        <div class="profile-section">
-          <div class="profile-section-label">What To Learn</div>
-          <p style="color:#c8d8e8;font-size:0.92rem;">${mapData.brain_insight}</p>
-        </div>` : ""}
-
-        <div class="profile-closing">
-          ${mapData.next_step}
-        </div>
-      </div>`;
-
-    return wrapper;
-  },
-
+  // ─── Helpers ────────────────────────────────────────────────────────────────
   addAssistantMessage(text) {
     const chatContainer = document.getElementById("chat-container");
     const el = UI.createAssistantMessage(text);
@@ -448,5 +372,11 @@ const App = {
   }
 };
 
+// Boot
 document.addEventListener("DOMContentLoaded", () => App.init());
 window.App = App;
+
+// Legacy global for inline onclick (start button)
+function startConversation() {
+  App.startConversation();
+}
