@@ -31,24 +31,24 @@
       <div class="carousel-track" id="carousel-track">
 
         <div class="carousel-slide" data-slide="0">
-          <span class="slide-label">The Question</span>
-          <h2 class="carousel-heading">Seven domains. One honest map.</h2>
-          <p>Path, Spark, Body, Finances, Relationships, Inner Game, Outer Game — seen together, as a whole. Not what you wish were true. Where you genuinely are.</p>
-          <p>Orientation starts with a clear picture.</p>
+          <span class="slide-label">The Map</span>
+          <h2 class="carousel-heading">Seven domains. One honest picture.</h2>
+          <p>Path · Spark · Body · Finances · Relationships · Inner Game · Outer Game — rated honestly, seen as a whole.</p>
+          <p>Most people sense that something is off somewhere. Orienteering shows you exactly where.</p>
         </div>
 
         <div class="carousel-slide" data-slide="1">
           <span class="slide-label">The Method</span>
-          <h2 class="carousel-heading">Three questions. Seven domains. Your map builds as you go.</h2>
-          <p>In each domain, you'll define what 10/10 looks like for someone like you — then describe where you honestly are — then name your actual wish. Your map takes shape after each domain lands.</p>
-          <p>The scale is yours. The finish line is yours. The map is yours.</p>
+          <h2 class="carousel-heading">One domain at a time. Your map builds as you go.</h2>
+          <p>For each domain, you'll place yourself honestly on a scale — then name what 10/10 looks like for you.</p>
+          <p>The scale is yours. No right answers. Only honest ones.</p>
         </div>
 
         <div class="carousel-slide" data-slide="2">
-          <span class="slide-label">The Commitment</span>
-          <h2 class="carousel-heading">No right answers. Only honest ones.</h2>
-          <p>This takes about 20–30 minutes. By the end, you'll know where you are, where you're going, and which three domains — if you focused on them — would move everything else.</p>
-          <p>The goal is a full yes life. Let's find out where you're starting from.</p>
+          <span class="slide-label">The Outcome</span>
+          <h2 class="carousel-heading">About 15 minutes. A full picture of where you are.</h2>
+          <p>By the end you'll know where you are across all seven domains, which areas are dragging everything else, and which three — if you focused on them — would move the most.</p>
+          <p>Navigate from clarity, not pressure.</p>
         </div>
 
       </div>
@@ -70,7 +70,6 @@
 
     <!-- Chat area -->
     <div id="chat-area" style="display:none; flex-direction:column; flex:1;">
-      <!-- Live wheel — builds as each domain completes -->
       <div id="wheel-container" class="wheel-container" style="display:none;">
         <canvas id="domain-wheel" width="280" height="280"></canvas>
         <div id="wheel-legend" class="wheel-legend"></div>
@@ -92,6 +91,20 @@
       <button class="btn-send" id="send-btn">Send</button>
     </div>
   </div>
+
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Supabase config — replace with your actual values from Vercel env or hardcode for now -->
+  <!-- In production these are injected at build time. For local dev, replace the placeholder strings. -->
+  <script>
+    window.SUPABASE_URL      = "YOUR_SUPABASE_URL";
+    window.SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+    // Once you have your Supabase project URL and anon key, paste them above.
+    // Example:
+    //   window.SUPABASE_URL      = "https://xxxxxxxxxxxx.supabase.co";
+    //   window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+  </script>
 
   <script src="/ui.js"></script>
   <script src="/app.js"></script>
