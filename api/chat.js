@@ -251,12 +251,10 @@ THE HORIZON SCALE — score against these precisely:
 
 CRITICAL: Any score below 5 means this domain is actively creating harm to the person and the people around them. Name this honestly in the reflection without shame. Use the tier language naturally.
 
-Also infer a horizon_score — what score the person is implicitly aiming for based on their avatar character and the quality of their horizon language. This is not their wish score, it's the coherent target implied by what they built. Usually 7-9.5.
-
 Write a 2-3 sentence reflection grounded in what they actually described. Warm, direct, precise. Reference specific things they said. Include the tier name naturally.
 
 Respond ONLY with valid JSON, no markdown:
-{"score":<0-10 in 0.5 increments>,"horizon_score":<6-10 in 0.5 increments>,"tier":"<tier name>","reflection":"<2-3 sentences>","invite_correction":"<one sentence>"}`;
+{"score":<0-10 in 0.5 increments>,"tier":"<tier name>","reflection":"<2-3 sentences>","invite_correction":"<one sentence>"}`;
 }
 
 // ─── Avatar synthesis prompt ──────────────────────────────────────────────────
@@ -306,27 +304,6 @@ OVERALL REFLECTION — 3-4 paragraphs. This is the recognition moment. Write as 
 
 Respond ONLY with valid JSON, no markdown:
 {"stage":"<Stabilisation|Orientation|Alignment|Development|Transformation>","stage_description":"<2-3 sentences specific to them, not generic>","focus_domains":["<id>","<id>","<id>"],"focus_reasoning":"<why these three — below-5 domains named first if present, then catalytic logic>","overall_reflection":"<3-4 paragraphs>","brain_insight":"<what the Brain answer reveals>","next_step":"<one honest specific sentence>"}`;
-}
-
-// ─── Build wheel data for frontend renderer ───────────────────────────────────
-function buildWheelData(session) {
-  const domainOrder = ["path", "spark", "body", "finances", "relationships", "inner_game", "outer_game"];
-  const labels = {
-    path: "Path", spark: "Spark", body: "Body",
-    finances: "Finances", relationships: "Relationships",
-    inner_game: "Inner Game", outer_game: "Outer Game"
-  };
-  return domainOrder.map(id => {
-    const d = session.domainData[id];
-    if (!d || d.score === undefined) return { id, label: labels[id], score: null, horizonScore: null };
-    return {
-      id,
-      label:        labels[id],
-      score:        d.score,
-      horizonScore: d.horizonScore || null,
-      tier:         d.tier || ""
-    };
-  });
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -394,7 +371,6 @@ module.exports = async (req, res) => {
         phaseLabel: "Your Life OS Map",
         complete: true,
         mapData: synthData,
-        wheelData: buildWheelData(session),
         inputMode: "none"
       });
     }
@@ -532,7 +508,6 @@ module.exports = async (req, res) => {
 
         session.domainData[domainId].score = inferData.score;
         session.domainData[domainId].tier  = inferData.tier || "";
-        session.domainData[domainId].horizonScore = inferData.horizon_score || Math.min(10, inferData.score + 2.5);
         session.phase = "placement_confirm";
         session.domainStep = "horizon";
         session.probeCount = 0;
@@ -543,7 +518,6 @@ module.exports = async (req, res) => {
           phase: "placement_confirm",
           phaseLabel: `${domain.label} — Placement`,
           message: `${inferData.reflection}\n\nI'm reading you at ${inferData.score}/10 in ${domain.label}${tierLabel}.\n\n${inferData.invite_correction}`,
-          wheelData: buildWheelData(session),
           inputMode: "text"
         });
       }
