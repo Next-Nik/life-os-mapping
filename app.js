@@ -67,17 +67,38 @@ function lsClear() {
 }
 
 // ─── Supabase session save ────────────────────────────────────────────────────
+// No unique constraint on user_id — orienteering_sessions keeps history.
+// First save inserts and stores the row id. Subsequent saves update that row.
 async function supabaseSaveSession(session, userId) {
   const sb = initSupabase();
   if (!sb || !userId) return;
   try {
-    await sb.from("orienteering_sessions").upsert({
-      user_id:    userId,
-      session:    session,
-      phase:      session.phase,
-      updated_at: new Date().toISOString(),
-      complete:   session.status === "complete" || session.phase === "complete"
-    }, { onConflict: "user_id" });
+    const isComplete = session.status === "complete" || session.phase === "complete";
+    if (App._sessionRowId) {
+      // Update the existing row for this session
+      await sb.from("orienteering_sessions").update({
+        session:      session,
+        phase:        session.phase,
+        updated_at:   new Date().toISOString(),
+        complete:     isComplete,
+        completed_at: isComplete ? new Date().toISOString() : null
+      }).eq("id", App._sessionRowId);
+    } else {
+      // Insert new row and store the id for future updates
+      const { data, error } = await sb
+        .from("orienteering_sessions")
+        .insert({
+          user_id:    userId,
+          session:    session,
+          phase:      session.phase,
+          updated_at: new Date().toISOString(),
+          complete:   isComplete
+        })
+        .select("id")
+        .single();
+      if (!error && data?.id) App._sessionRowId = data.id;
+      if (error) console.warn("Supabase insert failed:", error.message);
+    }
   } catch (err) {
     console.warn("Supabase autosave failed:", err);
   }
@@ -93,6 +114,7 @@ const App = {
   warningTimer:     null,
   autosaveTimer:    null,       // 5-min Supabase autosave interval
   pendingMapData:   null,       // held until auth decision at completion
+  _sessionRowId:    null,       // tracks current session DB row id (insert once, update after)
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   init() {
