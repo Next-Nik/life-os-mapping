@@ -362,6 +362,10 @@ const App = {
       this.session = data.session;
       // localStorage autosave after every response
       lsSave(this.session);
+      // Supabase save on every response if signed in
+      if (this.userId) {
+        supabaseSaveSession(this.session, this.userId);
+      }
     }
 
     const chatContainer = document.getElementById("chat-container");
