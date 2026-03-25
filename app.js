@@ -114,6 +114,23 @@ const App = {
     } catch {}
   },
 
+  // ─── Ensure anonymous session exists ──────────────────────────────────────
+  async ensureSession() {
+    if (this.userId) return; // already have a session
+    const sb = initSupabase();
+    if (!sb) return;
+    try {
+      const { data, error } = await sb.auth.signInAnonymously();
+      if (error) { console.warn('[Orienteering] Anonymous sign-in failed:', error.message); return; }
+      if (data?.user) {
+        this.userId = data.user.id;
+        console.log('[Orienteering] Anonymous session created:', data.user.id);
+      }
+    } catch (err) {
+      console.warn('[Orienteering] ensureSession error:', err);
+    }
+  },
+
   bindEvents() {
     let currentSlide = 0;
     const totalSlides = 3;
@@ -157,6 +174,9 @@ const App = {
   async startConversation() {
     UI.hideWelcome();
     UI.showChat();
+
+    // Create anonymous session on first meaningful engagement
+    await this.ensureSession();
 
     // Start the 10-minute warning timer (anonymous users only)
     this.startWarningTimer();
@@ -216,29 +236,25 @@ const App = {
   async signInWithEmail(email) {
     const sb = initSupabase();
     if (!sb) {
-      // Supabase not configured — store email locally for now, proceed as if signed in
       this.userEmail = email;
       this.onSignInSuccess(null, email);
       return;
     }
 
     try {
-      // Use OTP magic link — no password required
-      const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true }
-      });
-
+      // Use updateUser to upgrade anonymous session to identified.
+      // This preserves the anonymous user's existing data.
+      // Do NOT use signInWithOtp — it may create a separate auth flow.
+      const { error } = await sb.auth.updateUser({ email });
       if (error) throw error;
 
-      // OTP sent — user needs to click link in email.
-      // For now we treat them as "pending auth" and save what we have.
+      // Get the current user after upgrade
+      const { data: { user } } = await sb.auth.getUser();
       this.userEmail = email;
-      this.onSignInSuccess(null, email);
+      this.onSignInSuccess(user?.id || null, email);
 
     } catch (err) {
       console.warn("Sign in error:", err);
-      // Fail gracefully — store email, continue
       this.userEmail = email;
       this.onSignInSuccess(null, email);
     }
