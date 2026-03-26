@@ -1,7 +1,7 @@
 /* LIFE OS: THE MAP — STYLESHEET */
 /* Design system aligned to Pulse — warm gold #C8922A, Cormorant/Georgia, #FAFAF7 bg */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=Cormorant+SC:wght@400;600&display=swap');
 
 /* ─── CSS Variables ─────────────────────────────────────────────────────────── */
 :root {
@@ -1153,4 +1153,5 @@ body {
 
 .nav-btn:hover { color: #C8922A; }
 .nav-btn-restart { margin-left: auto; }
+
 
