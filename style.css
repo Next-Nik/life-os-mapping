@@ -1,7 +1,7 @@
 /* LIFE OS: THE MAP — STYLESHEET */
 /* Design system aligned to Pulse — warm gold #C8922A, Cormorant/Georgia, #FAFAF7 bg */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=Cormorant+SC:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&display=swap');
 
 /* ─── CSS Variables ─────────────────────────────────────────────────────────── */
 :root {
@@ -1155,3 +1155,138 @@ body {
 .nav-btn-restart { margin-left: auto; }
 
 
+/* ─── Life Horizon section ───────────────────────────────────────────────────── */
+.profile-horizon-section {
+  border-top: 1px solid var(--gold-rule, rgba(200,146,42,0.20));
+  padding-top: 24px;
+  margin-top: 8px;
+}
+
+.horizon-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 16px 18px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 16px;
+  font-weight: 300;
+  font-style: italic;
+  color: #0F1523;
+  background: #FFFFFF;
+  border: 1.5px dashed rgba(200,146,42,0.45);
+  border-radius: 14px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.7;
+  transition: border-color 0.2s, border-style 0.2s;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.horizon-textarea::placeholder {
+  color: rgba(15,21,35,0.30);
+  font-style: italic;
+}
+
+.horizon-textarea:focus {
+  border-style: solid;
+  border-color: rgba(200,146,42,0.78);
+}
+
+.horizon-note-hint {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(15,21,35,0.35);
+  margin-bottom: 16px;
+}
+
+.horizon-tool-output {
+  margin-bottom: 16px;
+}
+
+.horizon-expand-btn {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(15,21,35,0.45);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+  letter-spacing: 0.01em;
+}
+
+.horizon-expand-btn:hover { color: #C8922A; }
+
+.horizon-draft-text {
+  margin-top: 12px;
+  padding: 16px 18px;
+  background: rgba(200,146,42,0.03);
+  border: 1.5px solid rgba(200,146,42,0.20);
+  border-radius: 14px;
+}
+
+.horizon-draft-text p {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 16px;
+  font-weight: 300;
+  font-style: italic;
+  color: rgba(15,21,35,0.70);
+  line-height: 1.75;
+  margin-bottom: 12px;
+}
+
+.horizon-use-draft {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  font-style: italic;
+  color: #C8922A;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.horizon-use-draft:hover { opacity: 0.7; }
+
+.horizon-lock-btn {
+  display: block;
+  padding: 13px 28px;
+  border-radius: 40px;
+  border: 1.5px solid rgba(200,146,42,0.78);
+  background: rgba(200,146,42,0.05);
+  color: #C8922A;
+  font-family: 'Cormorant SC', Georgia, serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 4px;
+}
+
+.horizon-lock-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(15,21,35,0.08);
+  border-color: rgba(200,146,42,1);
+  background: rgba(200,146,42,0.08);
+}
+
+.horizon-locked-msg {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(15,21,35,0.50);
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.horizon-locked-msg span {
+  color: #C8922A;
+  font-style: normal;
+  font-family: 'Cormorant SC', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.10em;
+}

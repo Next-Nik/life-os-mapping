@@ -306,6 +306,35 @@ Respond ONLY with valid JSON, no markdown:
 {"stage":"<Stabilisation|Orientation|Alignment|Development|Transformation>","stage_description":"<2-3 sentences specific to them, not generic>","focus_domains":["<id>","<id>","<id>"],"focus_reasoning":"<why these three — below-5 domains named first if present, then catalytic logic>","overall_reflection":"<3-4 paragraphs>","brain_insight":"<what the Brain answer reveals>","next_step":"<one honest specific sentence>"}`;
 }
 
+
+// ─── Life Horizon synthesis prompt ───────────────────────────────────────────
+function lifeHorizonPrompt(session) {
+  const horizons = Object.entries(session.domainData).map(([id, data]) => {
+    const d = DOMAINS.find(d => d.id === id);
+    if (!d || !data.horizon) return null;
+    return `${d.label}: "${data.horizon}"`;
+  }).filter(Boolean).join("\n");
+
+  return `You have the seven domain Horizon Goals that someone expressed for their own life during a Life OS assessment. Each is their honest answer to "if a genie granted your wish here, what would it be?"
+
+Their seven domain horizons:
+${horizons}
+
+Their overall stage: ${session.brainAnswer ? "has completed Brain synthesis" : "assessment complete"}
+
+Write a single unified Life Horizon Goal that holds all seven of these together — the whole life, not a summary of parts. This is not a list. It is one paragraph, one to three sentences, written in the first person as if this person is speaking it. It should feel like something they could read and say "yes — that's actually it."
+
+Rules:
+- Written in first person ("I am..." or "My life is..." or "I live...")
+- One paragraph, 1-3 sentences maximum
+- Holds the emotional truth across all seven, not just the loudest ones
+- Describes a state, not a plan — present tense, alive quality
+- Plain language — no management speak, no spiritual clichés
+- Should feel like it could only have been written for this specific person based on what they shared
+
+Return ONLY the text of the Horizon Goal. No preamble, no explanation, no JSON.`;
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -341,11 +370,19 @@ module.exports = async (req, res) => {
       session.brainAnswer = userMessage;
       session.phase = "final_synthesis";
 
-      const synthResponse = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2500,
-        messages: [{ role: "user", content: finalSynthesisPrompt(session) }]
-      });
+      // Run map synthesis and life horizon synthesis in parallel
+      const [synthResponse, horizonResponse] = await Promise.all([
+        anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2500,
+          messages: [{ role: "user", content: finalSynthesisPrompt(session) }]
+        }),
+        anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 300,
+          messages: [{ role: "user", content: lifeHorizonPrompt(session) }]
+        })
+      ]);
 
       let synthData;
       try {
@@ -362,6 +399,10 @@ module.exports = async (req, res) => {
           next_step: "Start with your three focus domains and your Horizon Goal within each."
         };
       }
+
+      // Attach life horizon draft
+      const lifeHorizonDraft = horizonResponse.content[0].text.trim();
+      synthData.life_horizon_draft = lifeHorizonDraft;
 
       session.phase = "complete";
 
