@@ -18,17 +18,17 @@
 // For now reads from window.SUPABASE_URL / window.SUPABASE_ANON_KEY
 // which are set in index.html. See index.html for the script block.
 
-let supabase = null;
+let _sb = null;
 
 function initSupabase() {
-  if (supabase) return supabase;
+  if (_sb) return _sb;
   const url = window.SUPABASE_URL;
   const key = window.SUPABASE_ANON_KEY;
   if (!url || !key || url.includes("YOUR_")) return null;
 
   try {
-    supabase = window.supabase.createClient(url, key);
-    return supabase;
+    _sb = window.supabase.createClient(url, key);
+    return _sb;
   } catch {
     return null;
   }
@@ -100,20 +100,24 @@ const App = {
   init() {
     initSupabase();
     this.bindEvents();
-    this.checkExistingAuth();
+    this.readAuthGuardSession();
   },
 
-  // Check if user already has a Supabase session from a previous visit
-  async checkExistingAuth() {
-    const sb = initSupabase();
-    if (!sb) return;
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session?.user) {
-        this.userId    = session.user.id;
-        this.userEmail = session.user.email;
-      }
-    } catch {}
+  // Read session set by auth-init.js — no second Supabase call needed
+  readAuthGuardSession() {
+    if (window.LIFEOS_USER) {
+      this.userId    = window.LIFEOS_USER.id;
+      this.userEmail = window.LIFEOS_USER.email;
+    }
+    // Update profile dot
+    const dot = document.getElementById('nk-profile-dot');
+    if (dot && window.LIFEOS_USER) {
+      const initial = ((window.LIFEOS_USER.email||'').split('@')[0].charAt(0)||'?').toUpperCase();
+      dot.textContent = initial;
+      dot.href = 'https://nextus.world/profile.html';
+      dot.title = 'Your profile';
+      dot.style.display = 'flex';
+    }
   },
 
   bindEvents() {
