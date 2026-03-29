@@ -1,7 +1,8 @@
 // ============================================================
 // LIFE OS — AUTH GUARD v2 (PRODUCTION)
-// Redirects unauthenticated users to nextus.world/login.
-// 3-second timeout — fails open on slow network.
+// Pattern A — but gate is on the button, not on page load.
+// Page loads for everyone. Auth check runs silently.
+// Button updates based on session state.
 // ============================================================
 
 (async function() {
@@ -38,29 +39,29 @@
     timedOut: false
   }));
 
-  try {
-    const result = await Promise.race([sessionPromise, timeoutPromise]);
+  const result = await Promise.race([sessionPromise, timeoutPromise]);
 
-    if (result.timedOut) {
-      console.warn("[AuthGuard] Session check timed out — failing open.");
-      return;
+  if (result.timedOut || result.error) {
+    // Fail open — button stays as "Begin your map", tool works without session
+    console.warn("[AuthGuard] Session check failed or timed out — failing open.");
+    return;
+  }
+
+  if (result.session?.user) {
+    // Signed in — store user, button stays as "Begin your map"
+    window.LIFEOS_USER    = result.session.user;
+    window.LIFEOS_USER_ID = result.session.user.id;
+    console.log("[AuthGuard] Session active:", result.session.user.id);
+  } else {
+    // Not signed in — update button to invite sign-in
+    const btn = document.getElementById("begin-btn");
+    if (btn) {
+      btn.textContent = "Sign in to begin";
+      btn.addEventListener("click", function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        window.location.href = `${LOGIN_URL}?redirect=${REDIRECT_PARAM}`;
+      }, true); // capture phase — fires before app.js bind
     }
-
-    if (result.error) {
-      console.warn("[AuthGuard] Session check error — failing open:", result.error);
-      return;
-    }
-
-    if (result.session?.user) {
-      window.LIFEOS_USER    = result.session.user;
-      window.LIFEOS_USER_ID = result.session.user.id;
-      console.log("[AuthGuard] Session active:", result.session.user.id);
-    } else {
-      // No session — redirect to login with return URL
-      window.location.href = `${LOGIN_URL}?redirect=${REDIRECT_PARAM}`;
-    }
-
-  } catch (e) {
-    console.warn("[AuthGuard] Unexpected error — failing open:", e);
   }
 })();
