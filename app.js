@@ -18,17 +18,17 @@
 // For now reads from window.SUPABASE_URL / window.SUPABASE_ANON_KEY
 // which are set in index.html. See index.html for the script block.
 
-let supabase = null;
+let _sb = null;
 
 function initSupabase() {
-  if (supabase) return supabase;
+  if (_sb) return _sb;
   const url = window.SUPABASE_URL;
   const key = window.SUPABASE_ANON_KEY;
   if (!url || !key || url.includes("YOUR_")) return null;
 
   try {
-    supabase = window.supabase.createClient(url, key);
-    return supabase;
+    _sb = window.supabase.createClient(url, key);
+    return _sb;
   } catch {
     return null;
   }
@@ -67,7 +67,7 @@ function lsClear() {
 }
 
 // ─── Supabase session save ────────────────────────────────────────────────────
-async function supabaseSaveSession(session, userId) {
+async function supabaseSaveSession(session, userId, extras = {}) {
   const sb = initSupabase();
   if (!sb || !userId) return;
   try {
@@ -76,7 +76,8 @@ async function supabaseSaveSession(session, userId) {
       session:    session,
       phase:      session.phase,
       updated_at: new Date().toISOString(),
-      complete:   session.status === "complete" || session.phase === "complete"
+      complete:   session.status === "complete" || session.phase === "complete",
+      ...extras
     }, { onConflict: "user_id" });
   } catch (err) {
     console.warn("[TheMap] Supabase autosave failed:", err);
@@ -99,20 +100,24 @@ const App = {
   init() {
     initSupabase();
     this.bindEvents();
-    this.checkExistingAuth();
+    this.readAuthGuardSession();
   },
 
-  // Check if user already has a Supabase session from a previous visit
-  async checkExistingAuth() {
-    const sb = initSupabase();
-    if (!sb) return;
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (session?.user) {
-        this.userId    = session.user.id;
-        this.userEmail = session.user.email;
-      }
-    } catch {}
+  // Read session set by auth-init.js — no second Supabase call needed
+  readAuthGuardSession() {
+    if (window.LIFEOS_USER) {
+      this.userId    = window.LIFEOS_USER.id;
+      this.userEmail = window.LIFEOS_USER.email;
+    }
+    // Update profile dot
+    const dot = document.getElementById('nk-profile-dot');
+    if (dot && window.LIFEOS_USER) {
+      const initial = ((window.LIFEOS_USER.email||'').split('@')[0].charAt(0)||'?').toUpperCase();
+      dot.textContent = initial;
+      dot.href = 'https://nextus.world/profile.html';
+      dot.title = 'Your profile';
+      dot.style.display = 'flex';
+    }
   },
 
   bindEvents() {
@@ -363,9 +368,16 @@ const App = {
     chatContainer.appendChild(mapEl);
     setTimeout(() => mapEl.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
-    // Save to Supabase if signed in
+    // Save to Supabase if signed in — include horizon_goal_system from mapData
     if (this.userId) {
-      supabaseSaveSession({ ...session, phase: "complete", status: "complete" }, this.userId);
+      supabaseSaveSession(
+        { ...session, phase: "complete", status: "complete" },
+        this.userId,
+        {
+          horizon_goal_system: mapData.life_horizon_draft || null,
+          completed_at:        new Date().toISOString()
+        }
+      );
     }
 
     UI.setInputMode("none");
@@ -395,6 +407,7 @@ const App = {
 
   // ─── Full map render ────────────────────────────────────────────────────────
   renderFinalMap(mapData, session) {
+    this._horizonDraft = mapData.life_horizon_draft || null;
     const wrapper = document.createElement("div");
     wrapper.className = "message message-profile";
 
@@ -478,9 +491,124 @@ const App = {
         <div class="profile-closing">
           ${mapData.next_step}
         </div>
+
+        ${mapData.life_horizon_draft ? `
+        <div class="profile-section profile-horizon-section" id="horizonSection">
+          <div class="profile-section-label">Your Life Horizon</div>
+
+          <div class="horizon-note-area" id="horizonNoteArea">
+            <textarea
+              id="horizonPersonalNote"
+              class="horizon-textarea"
+              placeholder="Write your own Life Horizon here — in your own voice, your own words. What would a life fully lived actually look and feel like for you?"
+              oninput="App.onHorizonInput(this.value)"
+            ></textarea>
+            <p class="horizon-note-hint">This is yours. Edit it until it sounds like you.</p>
+          </div>
+
+          <div class="horizon-tool-output" id="horizonToolOutput">
+            <button class="horizon-expand-btn" id="horizonExpandBtn" onclick="App.toggleHorizonDraft()">
+              See what The Map drafted →
+            </button>
+            <div class="horizon-draft-text" id="horizonDraftText" style="display:none;">
+              <p>${mapData.life_horizon_draft}</p>
+              <button class="horizon-use-draft" onclick="App.useDraft()">Use this as my starting point →</button>
+            </div>
+          </div>
+
+          <button class="horizon-lock-btn" id="horizonLockBtn" onclick="App.lockHorizon()" style="display:none;">
+            Lock this as my Life Horizon ✓
+          </button>
+          <div class="horizon-locked-msg" id="horizonLockedMsg" style="display:none;">
+            <span>✓ Locked.</span> This is your Life Horizon — it will lead everywhere it appears.
+          </div>
+        </div>` : ""}
+
       </div>`;
 
     return wrapper;
+  },
+
+
+  // ─── Life Horizon mechanic ─────────────────────────────────────────────────
+  _horizonDraft: null,
+  _horizonLocked: false,
+
+  onHorizonInput(value) {
+    const lockBtn = document.getElementById("horizonLockBtn");
+    const expandBtn = document.getElementById("horizonExpandBtn");
+    if (lockBtn) lockBtn.style.display = value.trim() ? "block" : "none";
+    if (expandBtn) {
+      expandBtn.textContent = value.trim()
+        ? "See what The Map drafted →"
+        : "See what The Map drafted →";
+    }
+    // Save to localStorage as draft
+    try { localStorage.setItem("lifeos_map_horizon_note", value); } catch {}
+  },
+
+  toggleHorizonDraft() {
+    const draft   = document.getElementById("horizonDraftText");
+    const btn     = document.getElementById("horizonExpandBtn");
+    if (!draft) return;
+    const isOpen  = draft.style.display !== "none";
+    draft.style.display = isOpen ? "none" : "block";
+    btn.textContent = isOpen ? "See what The Map drafted →" : "Hide draft ↑";
+  },
+
+  useDraft() {
+    const draft    = document.getElementById("horizonDraftText");
+    const textarea = document.getElementById("horizonPersonalNote");
+    const text     = draft?.querySelector("p")?.textContent || "";
+    if (textarea && text) {
+      textarea.value = text;
+      this.onHorizonInput(text);
+      textarea.focus();
+      // Close the draft
+      draft.style.display = "none";
+      document.getElementById("horizonExpandBtn").textContent = "See what The Map drafted →";
+    }
+  },
+
+  async lockHorizon() {
+    const textarea  = document.getElementById("horizonPersonalNote");
+    const lockBtn   = document.getElementById("horizonLockBtn");
+    const lockedMsg = document.getElementById("horizonLockedMsg");
+    const value     = textarea?.value?.trim();
+    if (!value) return;
+
+    // Save horizon_goal_user to the most recent orienteering_sessions row
+    if (this.userId) {
+      try {
+        const sb = window.supabase?.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        if (sb) {
+          // Find the most recent completed session for this user and update it
+          const { data: rows } = await sb
+            .from("orienteering_sessions")
+            .select("id")
+            .eq("user_id", this.userId)
+            .eq("complete", true)
+            .order("updated_at", { ascending: false })
+            .limit(1);
+          if (rows?.[0]?.id) {
+            await sb.from("orienteering_sessions").update({
+              horizon_goal_user: value
+            }).eq("id", rows[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn("[TheMap] Horizon lock save failed:", err);
+      }
+    }
+
+    // Always save to localStorage as fallback
+    try { localStorage.setItem("lifeos_map_horizon_locked", value); } catch {}
+
+    // UI confirmation
+    this._horizonLocked = true;
+    if (lockBtn)   lockBtn.style.display   = "none";
+    if (lockedMsg) lockedMsg.style.display = "block";
+    if (textarea)  textarea.style.borderStyle = "solid";
   },
 
   // ─── Navigation ────────────────────────────────────────────────────────────
@@ -521,5 +649,14 @@ const App = {
   }
 };
 
-document.addEventListener("DOMContentLoaded", () => App.init());
+document.addEventListener("DOMContentLoaded", () => {
+  App.init();
+  // Auto-start — no welcome screen gate
+  // Wait for auth-init.js to resolve before starting
+  if (window.LIFEOS_USER !== undefined) {
+    App.startConversation();
+  } else {
+    window.addEventListener('lifeos:auth', () => App.startConversation(), { once: true });
+  }
+});
 window.App = App;
